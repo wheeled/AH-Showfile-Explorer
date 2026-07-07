@@ -1,5 +1,7 @@
 import os
 import sys
+import platform
+import subprocess
 import tkinter as tk
 import shutil
 from tkinter import messagebox
@@ -11,6 +13,7 @@ from sqreader import SQReader
 from PIL import ImageTk, Image
 
 dir_storage = Directories()
+environment = platform.system()
 
 
 def resource_path(relative_path):
@@ -68,9 +71,14 @@ class MainApplication(tk.Tk):
 
         # Create item context menu
         self.context_menu = tk.Menu(self, tearoff=False)
-        self.context_menu.add_command(label="Show in Explorer", command=self.show_in_explorer)
-        self.context_menu.add_command(label="Copy to..", command=self.copy)
-        self.context_menu.add_command(label="Move to..", command=self.cut)
+        if environment == "Darwin":
+            self.context_menu.add_command(label="Show in Finder", command=self.show_in_finder)
+            self.context_menu.add_command(label="[future] Copy to..", command=self.copy_on_mac)
+            self.context_menu.add_command(label="[future] Move to..", command=self.cut_on_mac)
+        else:
+            self.context_menu.add_command(label="Show in Explorer", command=self.show_in_explorer)
+            self.context_menu.add_command(label="Copy to..", command=self.copy)
+            self.context_menu.add_command(label="Move to..", command=self.cut)
         self.tree.bind("<Button-3>", self.show_context_menu)
 
         # Add icons to different types of items
@@ -106,6 +114,17 @@ class MainApplication(tk.Tk):
             # Open the file explorer at the location of the selected item or its containing directory
             os.startfile(item_path)
 
+    def show_in_finder(self):
+        selected_items = self.tree.selection()
+        if not selected_items:
+            return
+        for item in selected_items:
+            item_path = self.tree.set(item)["path"]
+            if os.path.isfile(item_path):
+                item_path = os.path.dirname(item_path)
+            # Open the finder at the location of the selected item or its containing directory
+            subprocess.call(["open", item_path])
+
     def copy(self):
         selected_items = self.tree.selection()
         if not selected_items:
@@ -131,6 +150,9 @@ class MainApplication(tk.Tk):
                     shutil.copy(item_path, destination_path)
                 except Exception as e:
                     messagebox.showerror("Error", str(e))
+
+    def copy_on_mac(self):
+        pass
 
     def cut(self):
         selected_items = self.tree.selection()
@@ -162,6 +184,9 @@ class MainApplication(tk.Tk):
                     self.tree.delete(item)
                 except Exception as e:
                     messagebox.showerror("Error", str(e))
+
+    def cut_on_mac(self):
+        pass
 
     @staticmethod
     def image_pad(in_image, pad_x=5):
