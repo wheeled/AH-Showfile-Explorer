@@ -3,8 +3,11 @@ from asset import Asset
 
 
 class Show(Asset):
-    def __init__(self, name, filename, path):
-        super().__init__(name, filename, path)
+    _structure = {
+        'name': (0, 16, "cleanup"),  # not certain of the length
+    }
+    def __init__(self, filename, path, format="SQ"):
+        super().__init__(filename, path)
         self.scenes = []
         self.libraries = []
 

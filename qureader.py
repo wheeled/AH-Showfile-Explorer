@@ -7,6 +7,7 @@ from show import Show
 
 
 class QuReader:
+    # QuReader remains essentially as is - file format appears to be different and I have no example
 
     @staticmethod
     def is_library(path):
@@ -33,56 +34,25 @@ class QuReader:
         if not os.path.exists(path):
             raise FileNotFoundError(f"File not found: {path}")
 
-        # Check if the filename matches the required pattern
-        filename = os.path.basename(path)
-        if not filename.lower().startswith("lib") or not filename.lower().endswith(".dat"):
-            raise ValueError("Invalid filename format. Filename should start with 'LIB' and end with '.DAT'.")
-
-        with open(path, "rb") as file:
-            # Seek to the start of the name field
-            file.seek(0x000001e8)
-            name_bytes = file.read(8)
-            # Convert bytes to string and strip whitespace
-            name = name_bytes.decode("utf-8").strip().strip("\x00")
-
-        return Library(name, filename, path)
+        filepath, filename = os.path.split(path)
+        return Library(filename, filepath, format="QU")
 
     @staticmethod
     def read_scene(path):
         if not os.path.exists(path):
             raise FileNotFoundError(f"File not found: {path}")
 
-        # Check if the filename matches the required pattern
-        filename = os.path.basename(path)
-        if not filename.lower().startswith("scene") or not filename.lower().endswith(".dat"):
-            raise ValueError("Invalid filename format. Filename should start with 'SCENE' and end with '.DAT'.")
-
-        with open(path, "rb") as file:
-            file.seek(0x0000000c)
-            name_bytes = file.read(8)
-            name = name_bytes.decode("utf-8").strip().strip("\x00")
-
-        return Scene(name, filename, path)
+        filepath, filename = os.path.split(path)
+        return Scene(filename, filepath, format="QU")
 
     @staticmethod
     def read_show(path):
         if not os.path.exists(path):
             raise FileNotFoundError(f"Folder not found: {path}")
-
-        filename = os.path.basename(path)
-        if not filename.lower().startswith("show"):
-            raise ValueError("Invalid folder name. It should start with 'SHOW'")
-
         showfilepath = os.path.join(path, "SHOW.DAT")
-
         if not os.path.exists(showfilepath):
             raise FileNotFoundError(f"File not found: {path}")
-
-        with open(os.path.join(path, "SHOW.DAT"), "rb") as file:
-            name_bytes = file.read(16)
-            name = name_bytes.decode("utf-8").strip().strip("\x00")
-
-        show = Show(name, filename, path)
+        show = Show(os.path.basename(showfilepath), path, format="QU")
 
         for temp_filename in os.listdir(path):
             temp_filepath = os.path.join(path, temp_filename)
