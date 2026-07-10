@@ -38,6 +38,10 @@ class DataTable:
         return self.data == other.data
 
     @property
+    def hide(self):
+        return hasattr(self, "name") and self.name == ""
+
+    @property
     def items(self):
         return {
             attr: getattr(self, attr) for attr in self.attrs
@@ -147,7 +151,7 @@ class DataTable:
         items = []
         for name, item in self:
             items.append((level, name, item))
-            if hasattr(item, "explode"):
+            if hasattr(item, "explode") and not item.hide:
                 items.extend(item.explode(level=level + 1))
         return items
 
@@ -248,6 +252,9 @@ class DataTable:
 class DataTableList(DataTable):
     def __init__(self, data, data_class, record_length, name, parent=None):
         super().__init__(data, parent=parent)
+        self.data_class = data_class
+        self.record_length = record_length
+        self.name = name
         sections = self.sections(record_length, name)
         for attr, section in sections:
             setattr(self, attr, data_class(section, parent=self))
