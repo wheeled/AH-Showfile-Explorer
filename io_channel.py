@@ -3,16 +3,6 @@ import math
 from data_table import DataTable
 
 
-"""
-col_sch = [[
-    ch.data[byte] for ch in sc0830.io_channels
-    if ch.name in ['MIC 1', 'MIC 2', 'VOX 1', 'VOX 2', 'Room L', 'Room R']]
-    for byte in range(len(sc0830.io_channels))]
-[(index, array) for index, array in enumerate(col_sch) if all([
-    array[0] == array[1], array[1] != array[2], array[2] == array[3]
-])]
-"""
-
 class IOChannel(DataTable):
     _structure = {  # attr_name: (start, length, method)
         "name": (0, 6, "cleanup"),
@@ -23,25 +13,28 @@ class IOChannel(DataTable):
         "unk021": (21, 3, "hex"),
         "channel": (24, 1, "parse_ch"),
         "interface": (26, 1, "parse_if"),
-        "unk043": (43, 1, "hex"),
-        "unk047": (47, 1, "hex"),
+        "unk030": (30, 1, "bool"), # relates to insert (30, b'\x00', b'\x18')
+        "sidechain": (36, 1, "uint"),
+        "unk038": (38, 1, "hex"),  # relates to sidechain or parallel
+        "unk042": (42, 2, "hex"),  # relates to insert (42, b'\x00\xfe', b'+\x00')
+        "unk047": (47, 1, "hex"),  # relates to insert (47, b'\xfe', b'\x00')
+        "unk049": (49, 1, "bool"), # relates to insert (49, b'\x01', b'\x00')
         "unk057": (57, 1, "hex"),
         "unk059": (59, 1, "hex"),
         "unk067": (67, 2, "hex"),
         "unk080": (80, 2, "hex"),
         "hpf_freq": (84, 2, "freq_flt"),  # confirmed
-        "unk087": (87, 1, "hex"),  # 0 or 1 - prob hpf_in
+        "hpf_in": (87, 1, "hex"),  # check
         "gate": (92, 32, "parse_gate"),  # confirmed
         "peq": (124, 24, "parse_eq"),  # confirmed
-        "compressor": (244, 40, "parse_comp"),
-        "unk295": (295, 1, "hex"),  # MIC 1-4 are different
-        "unk301": (301, 1, "hex"),  # ???
+        "peq_in": (173, 1, "bool"),
+        "compressor": (244, 58, "parse_comp"),
         "delay": (304, 2, "parse_delay"),  # confirmed
         "group": (316, 1, "uint"),  # group number?  drums 01, band 02
         "unk320": (320, 1, "hex"),  # another group number? drums and band both 02
         "unk324": (324, 2, "hex"),  # ST1, MP3 and PC-USB are different
         "unk328": (328, 1, "hex"),  # 0-87 are 03, 88-103 (outputs) are 02, 104-121 are 03 again
-        "unk331": (331, 2, "hex"),  #
+        "unk331": (331, 2, "hex"),  # mute: 0x00f8 = unmuted, 0x00fa = muted
         "end": (333, 3, "hex"),
     }
     def __init__(self, data, parent=None):
@@ -154,22 +147,42 @@ class Compressor(DataTable):
         "unk252": (8, 2, "hex"),
         # "comp_mode": (),  # RMS or Peak
         # "side_chain": (),  # self-keyed or another channel
-        # "filter_mode": (),  # HPF, BPF or LPF
-        # "filter_freq": (, 2, "freq_flt"),
-        # "filter_in": (, 1, "bool"),
-        # "parallel_path": (, 1, "bool"),
-        # "dry_level": (, 2, "dB_level"),
-        # "wet_level": (, 2, "dB_level"),
         # "soft_knee": (, 1, "bool"),
-        # "comp_in": (, 1, "bool"),
         "unk255": (11, 1, "hex"),  # ch 106 is different
         "unk257": (13, 3, "hex"),  # ch 106 is different
         "unk262": (18, 4, "hex"),  # ch 106 is different
-        "unk267": (23, 1, "hex"),  # compressor parameter ???
-        "ratio": (38, 2, "hex"),  # compressor parameter ???
+        "ratio": (23, 1, "parse_ratio"),  # compression ratio 0x20 = 6:1; 0x23 = 10:1
+        "unk282": (38, 2, "hex"),  # compressor parameter ???
+        "filter_freq": (48, 2, "freq_flt"),
+        "filter_mode": (50, 1, "parse_filt_type"),  # HPF, BPF or LPF
+        "filter_in": (51, 1, "bool"),  # check
+        "wet_level": (52, 2, "dB_level"),
+        "dry_level": (54, 2, "dB_level"),
+        "parallel_path": (56, 1, "bool"),  # check
+        "comp_in": (57, 1, "bool"),  # check
     }
     def __init__(self, data, **kwargs):
         super().__init__(data, **kwargs)
+
+    @staticmethod
+    def parse_ratio(segment):
+        ratios = {
+            b'\x23': "10:1", b'\x20': "6:1", b'\x14': "3:1", b'\x00': None,
+        }
+        if segment in ratios:
+            return ratios[segment]
+        else:
+            return segment
+
+    @staticmethod
+    def parse_filt_type(segment):
+        ratios = {
+            b'\x0b': "HPF", b'\x08': "BPF", b'?': "LPF", b'\x00': None,
+        }
+        if segment in ratios:
+            return ratios[segment]
+        else:
+            return segment
 
 
 class Gate(DataTable):

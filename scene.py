@@ -5,13 +5,14 @@ from io_channel import IOChannel
 from layers import Layer
 from levels import Levels
 from tabs import Tab
-from data_table import DataTable, Group, Mute, Checksum
+from data_table import DataTable, DataTableList, Group, Mute, Checksum
 
 
 class Scene(Asset):
     _structure = {
         'name': (20, 16, "cleanup"),  # not certain of the length
     }
+    attrs = ["io_channels", "channel_levels", "layers", "mix_groups", "mute_groups", "effects"]
     def __init__(self, filename, path, format="SQ", **kwargs):
         super().__init__(filename, path, **kwargs)
         if format == "QU":
@@ -22,7 +23,7 @@ class Scene(Asset):
             self.block_locations = [self.data.find(chr(n).encode('utf-8') + b'\xa5\xa5\xa5') for n in range(16)]
             # [-1, 56, 880, 41876, 42648, 43420, 80024, 81288, 83036, 83060, 83096, 84572, 84600, 87400, 89900, -1]
             self.io_channels = self.channels()
-            self.channel_names = [ch.name for ch in self.io_channels]
+            self.channel_names = [ch.name for tag, ch in self.io_channels]
             self.layer_setup = None
             self.layers = None
             self.parse_layers()
@@ -34,7 +35,7 @@ class Scene(Asset):
 
     @property
     def block_0(self):
-        #
+        # location 8 is involved with one of the changes in scene8f [(8, b'\x1a', b'\x14')]
         block_id = 0
         return DataTable(self.block(block_id))
 
@@ -43,14 +44,14 @@ class Scene(Asset):
         # no differences noticed
         block_id = 3
         record_length = 24
-        return [Group(section, parent=self) for section in self.sections(block_id, record_length)]
+        return DataTableList(self.block(block_id), Group, record_length, "mix-group", parent=self)
 
     @property
     def mute_groups(self):
         # no differences noticed
         block_id = 4
         record_length = 24
-        return [Mute(section, parent=self) for section in self.sections(block_id, record_length)]
+        return DataTableList(self.block(block_id), Mute, record_length, "mute-group", parent=self)
 
     @property
     def block_6(self):
@@ -60,7 +61,8 @@ class Scene(Asset):
         block_id = 6
         temp = DataTable(self.block(block_id))
         interval = 4
-        return [(n, interval, temp.hex(temp.data[n:n + interval])) for n in range(0, len(temp.data), interval)]
+        # return [(n, interval, temp.hex(temp.data[n:n + interval])) for n in range(0, len(temp.data), interval)]
+        return temp
 
     @property
     def block_7(self):
@@ -69,7 +71,8 @@ class Scene(Asset):
         # block_7 = [(index, hex(record), [sc0830.signed_int(record[n:n + 1]) for n in range(len(record))]) for index, record in enumerate(sc0830.block_7.data.split(b'\xfe'))]
         block_id = 7
         temp = DataTable(self.block(block_id))
-        return [[record[n] for n in range(len(record))] for record in temp.data.split(b'\xfe')]
+        # return [[record[n] for n in range(len(record))] for record in temp.data.split(b'\xfe')]
+        return temp
 
     @property
     def block_8(self):
@@ -130,7 +133,7 @@ class Scene(Asset):
     def channels(self):  # block includes both inputs and outputs
         block_id = 2
         record_length = 336  # TODO: can it be derived from the data?
-        return [IOChannel(section, parent=self) for section in self.sections(block_id, record_length)]
+        return DataTableList(self.block(block_id), IOChannel, record_length, "IO-port", parent=self)
 
     def divider(self, block_id):
         return chr(block_id).encode('utf-8') + b'\xa5\xa5\xa5'
@@ -138,11 +141,7 @@ class Scene(Asset):
     def levels(self):
         block_id = 5
         record_length = 300  # based on pattern of repetition of b'\xfe\xff'
-        # TODO: need to derive from the data
-        ch_levels = [
-            Levels(section, parent=self, name=ch_name)
-            for section, ch_name in zip(self.sections(block_id, record_length), self.channel_names)
-        ]
+        ch_levels = DataTableList(self.block(block_id), Levels, record_length, "ch-levels", parent=self)
         return ch_levels
 
     def limits(self, block_id):
@@ -158,8 +157,7 @@ class Scene(Asset):
     def parse_effects(self):
         block_id = 13
         record_length = 154
-        self.effects = [Effect(section, parent=self)
-                        for section in self.sections(block_id, record_length, exact_fit=False)]
+        self.effects = DataTableList(self.block(block_id)[:-(len(self.block(block_id)) % record_length)], Effect, record_length, "effect", parent=self)
         self.effects_suffix = DataTable(self.block(block_id)[record_length * len(self.effects):])
 
     def parse_layers(self):

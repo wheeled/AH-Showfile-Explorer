@@ -23,6 +23,7 @@ def resource_path(relative_path):
         base_path = sys._MEIPASS
     except Exception:
         base_path = os.path.abspath(".")
+        # print(base_path, relative_path)
     return os.path.join(base_path, relative_path)
 
 
@@ -204,7 +205,7 @@ class MainApplication(tk.Tk):
             self.populate_tree()
 
     def sq_scan_directory(self):
-        directory_path = filedialog.askdirectory(title="Select a folder containing AHQU data")
+        directory_path = filedialog.askdirectory(title="Select a folder containing AHSQ data")
         if directory_path:
             temp_directory = SQReader.scan_folder(directory_path)
             temp_directory.set_name(os.path.basename(directory_path))
@@ -229,8 +230,16 @@ class MainApplication(tk.Tk):
                                            tags=("show",))
                 # Insert scenes under the show
                 for scene in show.scenes:
-                    self.tree.insert(show_id, "end", text=scene.name, values=(scene.filename, scene.path, scene),
+                    scene_id = self.tree.insert(show_id, "end", text=scene.name, values=(scene.filename, scene.path, scene),
                                      tags=("scene",))
+                    tab_levels = [scene_id]
+                    for level, name, value in scene.explode():
+                        next_id = self.tree.insert(tab_levels[level], "end", text=name, values=(name, value))
+                        try:
+                            tab_levels[level + 1] = next_id
+                        except IndexError:
+                            tab_levels.append(next_id)
+
                 # Insert libraries under the show
                 for library in show.libraries:
                     self.tree.insert(show_id, "end", text=library.name,

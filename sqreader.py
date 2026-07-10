@@ -51,7 +51,7 @@ class SQReader:
             raise FileNotFoundError(f"File not found: {path}")
         show = Show(os.path.basename(showfilepath), path, format="SQ")
 
-        for temp_filename in os.listdir(path):
+        for temp_filename in sorted(os.listdir(path)):
             temp_filepath = os.path.join(path, temp_filename)
 
             if temp_filename.lower().startswith("scene") and temp_filename.lower().endswith(".dat"):
@@ -92,6 +92,7 @@ class SQReader:
                 file_path = os.path.join(path, "SCENES", filename)
                 if SQReader.is_library(file_path):
                     temp_directory.add_library(SQReader.read_scene(file_path))
+            pass
 
         # Check for shows
         if os.path.exists(os.path.join(path, "SHOWS")):

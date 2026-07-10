@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import hashlib
+from typing import Any
+
 import math
 # import mmh3
 import zlib
@@ -29,8 +31,18 @@ class DataTable:
         else:
             return f"{self.__class__.__name__}()"
 
+    def __iter__(self):
+        yield from self.items
+
     def __eq__(self, other):
         return self.data == other.data
+
+    @property
+    def items(self):
+        return {
+            attr: getattr(self, attr) for attr in self.attrs
+            if not attr.startswith("unk")
+        }.items()
 
     @property
     def _bin(self) -> str:
@@ -55,8 +67,11 @@ class DataTable:
     @property
     def unattributed(self) -> list[tuple[int, int, str]]:
         if hasattr(self, "attrs"):
-            attributed = [i for attr in self.attrs for i in
-                          range(self._structure[attr][0], self._structure[attr][0] + self._structure[attr][1])]
+            try:
+                attributed = [i for attr in self.attrs for i in
+                              range(self._structure[attr][0], self._structure[attr][0] + self._structure[attr][1])]
+            except KeyError:
+                return None
             unattributed = [i for i in range(len(self.data)) if i not in attributed]
             reduced = []
             start = 0
@@ -127,6 +142,14 @@ class DataTable:
 
     def dB_level(self, segment):
         return self.sig_digits((self.uint(segment) - 0x8000) / 256)
+
+    def explode(self, level=0) -> list[tuple[int, str, Any]]:
+        items = []
+        for name, item in self:
+            items.append((level, name, item))
+            if hasattr(item, "explode"):
+                items.extend(item.explode(level=level + 1))
+        return items
 
     def flt16(self, segment, exp_len=5, mant_len=10):  # not used
         if isinstance(segment, bytes):
@@ -220,6 +243,27 @@ class DataTable:
 
     def uint(self, segment):
         return self.signed_int(segment, byte_order="little", signed=False)
+
+
+class DataTableList(DataTable):
+    def __init__(self, data, data_class, record_length, name, parent=None):
+        super().__init__(data, parent=parent)
+        sections = self.sections(record_length, name)
+        for attr, section in sections:
+            setattr(self, attr, data_class(section, parent=self))
+        self.attrs = [attr for attr, section in sections]
+
+    def __len__(self):
+        return len(self.attrs)
+
+    def sections(self, record_length, tag, exact_fit=True):
+        records = len(self.data) / record_length
+        digits = int(math.log10(records)) + 1
+        if records - int(records) == 0 or exact_fit is False:
+            records = int(records)
+        else:
+            raise ValueError(f"block size ({len(self.data)}) is not an integer multiple of record_length ({record_length})")
+        return [(f"{tag}.{n:0{digits}}", self.data[n * record_length:(n + 1) * record_length]) for n in range(records)]
 
 
 class Group(DataTable):

@@ -27,4 +27,7 @@ class LayerChannel(DataTable):
         if not self.active:
             return ""
         else:
-            return self.parent.parent.channel_names[segment[0]]
+            try:
+                return self.parent.parent.channel_names[segment[0]]
+            except IndexError:
+                pass
